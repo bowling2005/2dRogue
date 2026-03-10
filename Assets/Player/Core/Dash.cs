@@ -1,47 +1,62 @@
 using UnityEngine;
 
-// 1. 定义新动作类
 public class DashAction : ActionBase
 {
-    private float dashDuration = 0.3f;
-    private float timer = 0f;
-    private Vector2 dashDir;
+
+    [SerializeField] private float _dashDuration = 0.3f;
+    [SerializeField] private float _dashSpeed = 15f;
+    private float _elapsedTime;
+    private Vector2 _dashDirection;
+    private Vector2 _inputDirection;
+    private bool _hasCustomDirection;
 
     public DashAction()
     {
-        // 在构造函数或 Init 中设定 ID
-        // 建议定义一个全局 ActionID 枚举来管理这些数字
         Init(1001, "Dash");
+    }
+
+    public override bool CanInterrupt => false;  // 冲刺中不可打断
+    public override int Priority => 1;           // 优先级高于普通移动
+
+    public void SetInputDirection(Vector2 direction)
+    {
+        _inputDirection = direction.normalized;
+        _hasCustomDirection = true;
     }
 
     public override void OnEnter(CharacterActionSystem owner)
     {
         base.OnEnter(owner);
-        timer = 0f;
-        // 获取输入方向或角色朝向
-        dashDir = owner.GetTransform().right;
-        owner.PlayAnim("Dash");
-        Debug.Log("Dash Start!");
+        _elapsedTime = 0f;
+
+        _dashDirection = _hasCustomDirection && _inputDirection != Vector2.zero
+            ? _inputDirection
+            : owner.GetTransform().right;
+
+        owner.PlayAnimTrigger("Dash");
+
+        Debug.Log($"[Dash] Start | Direction: {_dashDirection}");
     }
 
     public override void OnUpdate(CharacterActionSystem owner, float deltaTime)
     {
         base.OnUpdate(owner, deltaTime);
-        timer += deltaTime;
-        // 执行移动逻辑
-        owner.MoveCharacter(dashDir * 10f);
+        _elapsedTime += deltaTime;
+
+        owner.MoveCharacter(_dashDirection, _dashSpeed, useForce: false, preserveY: true);
     }
 
     public override bool IsFinished(CharacterActionSystem owner)
     {
-        // 时间到了就结束
-        return timer >= dashDuration;
+        return _elapsedTime >= _dashDuration;
     }
 
-    public override bool CheckCondition(CharacterActionSystem owner)
+    public override void OnExit(CharacterActionSystem owner)
     {
-        // 例如：只有在地面才能冲刺
-        // return owner.IsGrounded; 
-        return true;
+        base.OnExit(owner);
+
+        owner.SetAnimBool("IsDashing", false);
+
+        Debug.Log("[Dash] End");
     }
 }

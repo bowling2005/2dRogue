@@ -16,12 +16,11 @@ public class CharacterActionSystem : MonoBehaviour
     // 当前正在执行的动作节点
     public ActionNode currentActionNode = null;
 
-    // 动作库 (ID -> ActionBase 实例映射)
-    // 建议在一个全局管理器中注册，这里为了演示写在本地
-    private Dictionary<int, ActionBase> actionLibrary = new Dictionary<int, ActionBase>();
+    private ActionDictionary actionLibrary = new ActionDictionary();
 
     // 当前激活的动作逻辑实例
     private ActionBase currentActionLogic = null;
+
 
     private void Update()
     {
@@ -30,14 +29,11 @@ public class CharacterActionSystem : MonoBehaviour
         UpdateCurrentAction(dt);
     }
 
-    /// <summary>
-    /// 外部调用：添加新动作到队列
-    /// </summary>
     public void QueueAction(int actionID)
     {
         if (actionQueue.Count >= maxQueueSize) return;
 
-        // 检查是否已禁用 (可选逻辑)
+        // 检查是否已禁用
         if (IsActionDisabled(actionID))
         {
             Debug.Log($"Action {actionID} is Disabled.");
@@ -50,27 +46,19 @@ public class CharacterActionSystem : MonoBehaviour
         Debug.Log($"Queued Action: {actionID}");
     }
 
-    /// <summary>
-    /// 注册动作逻辑 (游戏启动时调用)
-    /// </summary>
-    public void RegisterAction(ActionBase action)
-    {
-        if (!actionLibrary.ContainsKey(action.ActionID))
-        {
-            actionLibrary.Add(action.ActionID, action);
-        }
-    }
+    public void RegisterAction(ActionBase action){actionLibrary.Add(action.ActionID, action);}
 
     private void ProcessQueue(float dt)
     {
         // 如果当前没有动作，尝试从队列取一个
         if (currentActionNode == null && actionQueue.Count > 0)
         {
-            ActionNode nextNode = actionQueue.Peek(); // 先 peek 检查条件
+            ActionNode nextNode = actionQueue.Peek(); // 先 peek 检查条件(牛逼，gpt还知道peek)
 
-            if (actionLibrary.TryGetValue(nextNode.actionID, out ActionBase logic))
+            ActionBase logic = actionLibrary.Get(nextNode.actionID);
+
+            if (logic!=null)
             {
-                // 检查条件
                 if (logic.CheckCondition(this))
                 {
                     // 检查打断
@@ -126,23 +114,84 @@ public class CharacterActionSystem : MonoBehaviour
 
     private bool IsActionDisabled(int id)
     {
-        // 这里可以检查全局冷却、状态锁等
+        //检测逻辑
         return false;
     }
 
-    // --- 供 ActionBase 调用的辅助接口 ---
-    public void PlayAnim(string animName)
+    // --- 组件引用 ---
+    public Rigidbody2D characterRigidbody2d;
+    public Animator characterAnimator;
+
+    // --- 动画控制接口 ---
+
+    public void PlayAnimTrigger(string triggerName)
     {
-        // 连接你的 Animator
-        // GetComponent<Animator>().Play(animName);
-        Debug.Log($"[Anim] Play: {animName}");
+        if (characterAnimator == null)
+            characterAnimator = GetComponent<Animator>();
+
+        characterAnimator?.SetTrigger(triggerName);
+        Debug.Log($"[Anim] Trigger: {triggerName}");
     }
 
-    public void MoveCharacter(Vector2 dir)
+    public void SetAnimBool(string paramName, bool value)
     {
-        // 连接你的 CharacterController 或 Rigidbody
-        Debug.Log($"[Move] Dir: {dir}");
+        if (characterAnimator == null)
+            characterAnimator = GetComponent<Animator>();
+
+        characterAnimator?.SetBool(paramName, value);
     }
 
-    public Transform GetTransform() => transform;
+    public void SetAnimFloat(string paramName, float value)
+    {
+        if (characterAnimator == null)
+            characterAnimator = GetComponent<Animator>();
+
+        characterAnimator?.SetFloat(paramName, value);
+    }
+
+    public void SetAnimInt(string paramName, int value)
+    {
+        if (characterAnimator == null)
+            characterAnimator = GetComponent<Animator>();
+
+        characterAnimator?.SetInteger(paramName, value);
+    }
+
+    // --- 移动接口（统一用 MoveCharacter）---
+
+    public void MoveCharacter(Vector2 dir, float speed = 10f, bool useForce = false, bool preserveY = true)
+    {
+        if (characterRigidbody2d == null)
+            characterRigidbody2d = GetComponent<Rigidbody2D>();
+
+        if (characterRigidbody2d == null) return;
+
+        Vector2 targetVelocity = dir.normalized * speed;
+
+        if (preserveY)
+            targetVelocity.y = characterRigidbody2d.velocity.y;
+
+        if (useForce)
+            characterRigidbody2d.AddForce(targetVelocity, ForceMode2D.Force);
+        else
+            characterRigidbody2d.velocity = targetVelocity;
+    }
+
+    // --- 辅助接口 ---
+
+    private Transform _cachedTransform;
+    public Transform GetTransform()
+    {
+        return _cachedTransform ??= transform;
+    }
+
+    public Vector2 GetVelocity()
+    {
+        return characterRigidbody2d != null ? characterRigidbody2d.velocity : Vector2.zero;
+    }
+
+    public bool IsGrounded(Transform groundCheckPoint, float checkRadius, LayerMask groundLayer)
+    {
+        return Physics2D.OverlapCircle(groundCheckPoint.position, checkRadius, groundLayer);
+    }
 }
