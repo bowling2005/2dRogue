@@ -3,47 +3,48 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterActionSystem))]
 public class PlayerController : MonoBehaviour
 {
-    // 配置参数
+    [Header("Movement")]
+    [SerializeField] private float _walkSpeed = 5f;
+    [SerializeField] private float _dashSpeed = 15f;
+    [SerializeField] private float _jumpForce = 8f;
+
     [Header("Action IDs")]
-    [SerializeField] private int _actionIdWalk = 1002;
-    [SerializeField] private int _actionIdDash = 1001;
-    [SerializeField] private int _actionIdJump = 1003;
+    [SerializeField] private int _idIdle = 1000;
+    [SerializeField] private int _idWalk = 1002;
+    [SerializeField] private int _idJump = 1003;
+    [SerializeField] private int _idDash = 1001;
 
     [Header("Ground Check")]
     [SerializeField] private Transform _groundCheckPoint;
-    [SerializeField] private float _groundCheckRadius = 0.2f;
-    [SerializeField] private LayerMask _groundLayer;  // 设置为 "Ground_checkLayer"
+    [SerializeField] private float _groundRadius = 0.2f;
+    [SerializeField] private LayerMask _groundLayer;  // 设为 "Ground_checkLayer"
 
-    // 组件缓存
-    private CharacterActionSystem _actionSystem;
-    private CharacterActionSystem ActionSystem => _actionSystem ??= GetComponent<CharacterActionSystem>();
+    private CharacterActionSystem _system;
+    private CharacterActionSystem System => _system ??= GetComponent<CharacterActionSystem>();
 
     // 输入状态
     private Vector2 _moveInput;
     private bool _jumpRequested;
     private bool _dashRequested;
-
-    // 接地状态
     private bool _isGrounded;
-    public bool IsGrounded => _isGrounded;
+
+    // 缓冲时间配置
+    private const float BUFFER_JUMP = 0.2f;   // 跳跃缓冲 0.2 秒
+    private const float BUFFER_DASH = 0.15f;  // 冲刺缓冲 0.15 秒
+    private const float BUFFER_WALK = 0.1f;   // 行走缓冲 0.1 秒
 
     private void Awake()
     {
-        _actionSystem = GetComponent<CharacterActionSystem>();
+        _system = GetComponent<CharacterActionSystem>();
         RegisterActions();
-
-        if ((_groundLayer.value & (1 << LayerMask.NameToLayer("Ground_checkLayer"))) == 0)
-        {
-            Debug.LogWarning("[Player] Ground Layer 未包含 'Ground_checkLayer'！");
-        }
     }
 
     private void RegisterActions()
     {
-        ActionSystem.RegisterAction(new WalkAction());
-        ActionSystem.RegisterAction(new DashAction());
-        ActionSystem.RegisterAction(new JumpAction());
-        Debug.Log("[Player] Actions Registered");
+        System.RegisterAction(new IdleAction());
+        System.RegisterAction(new WalkAction());
+        System.RegisterAction(new JumpAction());
+        System.RegisterAction(new DashAction());
     }
 
     private void Update()
@@ -51,79 +52,66 @@ public class PlayerController : MonoBehaviour
         CollectInput();
         UpdateGroundCheck();
         RequestActions();
-        UpdateAnimationParams();
     }
 
     private void CollectInput()
     {
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        _moveInput = new Vector2(horizontal, 0f).normalized;
+        // 获取输入
+        float h = Input.GetAxisRaw("Horizontal");
+        _moveInput = new Vector2(h, 0f).normalized;
+        if (_moveInput.x > 0.1f)
+            transform.localScale = new Vector3(1, 1, 1);
+        else if (_moveInput.x < -0.1f)
+            transform.localScale = new Vector3(-1, 1, 1);
 
-        
-        _jumpRequested = Input.GetKeyDown(KeyCode.Space);
-        _dashRequested = Input.GetKeyDown(KeyCode.L);
+        // 请求标记（按键按下瞬间触发）
+        _jumpRequested |= Input.GetKeyDown(KeyCode.Space);
+        _dashRequested |= Input.GetKeyDown(KeyCode.L);
     }
 
     private void UpdateGroundCheck()
     {
-        _isGrounded = ActionSystem.IsGrounded(_groundCheckPoint, _groundCheckRadius, _groundLayer);
+        _isGrounded = System.IsGrounded(_groundCheckPoint, _groundRadius, _groundLayer);
     }
 
     private void RequestActions()
     {
-        //优先级：跳跃 > 冲刺 > 行走
+        //  优先级：跳跃 > 冲刺 > 行走 > 待机
 
-        // 跳跃（需接地）
-        if (_jumpRequested && _isGrounded)
+        //跳跃请求（支持预输入缓冲）
+        if (_jumpRequested)
         {
-            var jump = new JumpAction();
-            jump.SetGroundCheck(_groundCheckPoint, _groundCheckRadius, _groundLayer);
-
-            //通过反射或修改 JumpAction 来设置 jumpForce，这里简化处理
-            ActionSystem.RegisterAction(jump);
-            ActionSystem.QueueAction(_actionIdJump);
-
-            _jumpRequested = false;
-            return;
+            var ctx = new JumpContext { jumpForce = _jumpForce };
+            System.QueueAction(_idJump, BUFFER_JUMP, ctx);
+            _jumpRequested = false;  // 消耗请求
         }
 
-        // 冲刺（需有方向）
-        if (_dashRequested && _moveInput != Vector2.zero)
+        //冲刺请求
+        if (_dashRequested)
         {
-            var dash = new DashAction();
-            dash.SetInputDirection(_moveInput);
-            ActionSystem.RegisterAction(dash);
-            ActionSystem.QueueAction(_actionIdDash);
-
+            var ctx = new DashContext { direction = _moveInput, speed = _dashSpeed };
+            System.QueueAction(_idDash, BUFFER_DASH, ctx);
             _dashRequested = false;
-            return;
         }
 
-        // 行走（接地且有输入时）
-        if (_isGrounded && _moveInput != Vector2.zero)
+        //行走请求（持续请求，系统会去重更新）
+        // 只有接地时才允许行走
+        if (_isGrounded)
         {
-                var walk = new WalkAction();
-                walk.SetMoveInput(_moveInput);
-                walk.SetGroundCheck(_groundCheckPoint, _groundCheckRadius, _groundLayer);
-                ActionSystem.RegisterAction(walk);
-                ActionSystem.QueueAction(_actionIdWalk);
+            var ctx = new WalkContext { direction = _moveInput, speed = _walkSpeed };
+            System.QueueOrUpdateAction(_idWalk, BUFFER_WALK, ctx);
         }
-        // 待机
-        else if (_isGrounded && _moveInput == Vector2.zero)
-        {
-            ActionSystem.SetAnimBool("IsMoving", false);
-        }
-    }
 
-    private void UpdateAnimationParams()
-    {
-        // 基础状态参数
-        ActionSystem.SetAnimBool("IsGrounded", _isGrounded);
-        ActionSystem.SetAnimFloat("Horizontal", _moveInput.x);
-        if (_moveInput.x > 0.1f)
-            transform.localScale = new Vector3(1, 1, 1); // 朝右
-        else if (_moveInput.x < -0.1f)
-            transform.localScale = new Vector3(-1, 1, 1); // 朝左
+        //待机请求：接地 + 无输入 + 无高优先级请求时
+        if (_isGrounded && _moveInput == Vector2.zero && !_jumpRequested && !_dashRequested)
+        {
+            System.QueueOrUpdateAction(_idIdle, 0f);  // 待机不需要缓冲
+        }
     }
 
 }
+
+//上下文类：传递动作参数（类型安全）
+public class WalkContext { public Vector2 direction; public float speed; }
+public class JumpContext { public float jumpForce; }
+public class DashContext { public Vector2 direction; public float speed; }

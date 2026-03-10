@@ -1,60 +1,46 @@
-using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 public class ActionDictionary
 {
-    private Dictionary<int, ActionBase> actionLibrary;
-
-    public void Init()
-    {
-        actionLibrary = new Dictionary<int, ActionBase>();
-    }
+    private readonly Dictionary<int, ActionBase> _dictionary = new Dictionary<int, ActionBase>();
 
     public bool Add(int id, ActionBase action)
     {
-
-        if (actionLibrary.ContainsKey(id))
+        if (action == null)
         {
-            //动作已存在，将覆盖原有动作
-            actionLibrary[id] = action;
+            Debug.LogWarning($"[ActionDictionary] 尝试添加 null 动作 (ID:{id})");
             return false;
         }
-        actionLibrary.Add(id, action);
-        return true;
-    }
 
-    public bool Delete(int id)
-    {
-        if (actionLibrary == null)
-        {
-            throw new InvalidOperationException("请先调用 Init() 初始化字典");
-        }
-        return actionLibrary.Remove(id);
+        bool isNew = !_dictionary.ContainsKey(id);
+        _dictionary[id] = action;  // 直接赋值，支持覆盖
+
+        return isNew;
     }
     public ActionBase Get(int id)
     {
-        if (actionLibrary == null)
-        {
-            throw new InvalidOperationException("请先调用 Init() 初始化字典");
-        }
-
-        actionLibrary.TryGetValue(id, out ActionBase action);
+        _dictionary.TryGetValue(id, out ActionBase action);
         return action;
     }
+
+    /// <summary>
+    /// 删除动作
+    /// </summary>
+    public bool Remove(int id)
+    {
+        return _dictionary.Remove(id);
+    }
+
     public bool ContainsKey(int id)
     {
-        if (actionLibrary == null)
-        {
-            throw new InvalidOperationException("请先调用 Init() 初始化字典");
-        }
-
-        return actionLibrary.ContainsKey(id);
+        return _dictionary.ContainsKey(id);
     }
+
     public void Clear()
     {
-        if (actionLibrary != null)
-        {
-            actionLibrary.Clear();
-        }
+        _dictionary.Clear();
     }
+
+    public int Count => _dictionary.Count;
 }

@@ -2,61 +2,48 @@ using UnityEngine;
 
 public class DashAction : ActionBase
 {
+    [SerializeField] private float _defaultDuration = 0.3f;
+    [SerializeField] private float _defaultSpeed = 15f;
 
-    [SerializeField] private float _dashDuration = 0.3f;
-    [SerializeField] private float _dashSpeed = 15f;
-    private float _elapsedTime;
-    private Vector2 _dashDirection;
-    private Vector2 _inputDirection;
-    private bool _hasCustomDirection;
+    private float _elapsed;
+    private Vector2 _direction;
 
-    public DashAction()
-    {
-        Init(1001, "Dash");
-    }
+    public DashAction() => Init(1001, "Dash");
 
-    public override bool CanInterrupt => false;  // 冲刺中不可打断
-    public override int Priority => 1;           // 优先级高于普通移动
-
-    public void SetInputDirection(Vector2 direction)
-    {
-        _inputDirection = direction.normalized;
-        _hasCustomDirection = true;
-    }
+    public override int Priority => 1;
+    public override bool CanInterrupt => false;
 
     public override void OnEnter(CharacterActionSystem owner)
     {
-        base.OnEnter(owner);
-        _elapsedTime = 0f;
+        _elapsed = 0f;
 
-        _dashDirection = _hasCustomDirection && _inputDirection != Vector2.zero
-            ? _inputDirection
-            : owner.GetTransform().right;
+        // 从上下文获取参数
+        var ctx = owner.CurrentActionNode?.GetContext<DashContext>();
+        _direction = (ctx?.direction ?? owner.GetTransform().right).normalized;
+        float speed = ctx?.speed ?? _defaultSpeed;
 
         owner.PlayAnimTrigger("Dash");
-
-        Debug.Log($"[Dash] Start | Direction: {_dashDirection}");
+        Debug.Log($"[Dash] Start | Dir:{_direction}");
     }
 
     public override void OnUpdate(CharacterActionSystem owner, float deltaTime)
     {
-        base.OnUpdate(owner, deltaTime);
-        _elapsedTime += deltaTime;
+        _elapsed += deltaTime;
+        var ctx = owner.CurrentActionNode?.GetContext<DashContext>();
+        float speed = ctx?.speed ?? _defaultSpeed;
 
-        owner.MoveCharacter(_dashDirection, _dashSpeed, useForce: false, preserveY: true);
+        owner.MoveCharacter(_direction, speed, useForce: false, preserveY: true);
     }
 
     public override bool IsFinished(CharacterActionSystem owner)
     {
-        return _elapsedTime >= _dashDuration;
+        var ctx = owner.CurrentActionNode?.GetContext<DashContext>();
+        float duration = ctx != null ? _defaultDuration : _defaultDuration;  // 可扩展
+        return _elapsed >= duration;
     }
 
     public override void OnExit(CharacterActionSystem owner)
     {
-        base.OnExit(owner);
-
-        owner.SetAnimBool("IsDashing", false);
-
         Debug.Log("[Dash] End");
     }
 }
