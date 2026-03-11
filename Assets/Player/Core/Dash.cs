@@ -2,48 +2,90 @@ using UnityEngine;
 
 public class DashAction : ActionBase
 {
-    [SerializeField] private float _defaultDuration = 0.3f;
-    [SerializeField] private float _defaultSpeed = 15f;
+    private float duration = 0.25f;
+    private float speed = 25f;
+    private float elapsed = 0f;
+    private Vector2 direction = Vector2.right;
 
-    private float _elapsed;
-    private Vector2 _direction;
-
-    public DashAction() => Init(1001, "Dash");
-
-    public override int Priority => 1;
+    public override int Priority => 100;
     public override bool CanInterrupt => false;
+
+    public DashAction(int id, string name)
+    {
+        Init(id, name);
+    }
+
+    public override bool CheckCondition(CharacterActionSystem owner)
+    {
+        return true;
+    }
 
     public override void OnEnter(CharacterActionSystem owner)
     {
-        _elapsed = 0f;
+        // 获取玩家
+        PlayerController player = owner.GetComponent<PlayerController>();
+        if (player == null) return;
 
-        // 从上下文获取参数
-        var ctx = owner.CurrentActionNode?.GetContext<DashContext>();
-        _direction = (ctx?.direction ?? owner.GetTransform().right).normalized;
-        float speed = ctx?.speed ?? _defaultSpeed;
+        // 获取方向：从 context 强转，没有就用默认
+        ActionNode node = owner.CurrentActionNode;
+        if (node != null && node.context != null)
+        {
+            direction = (Vector2)node.context;
+        }
+        else
+        {
+            direction = player.transform.right;
+        }
 
-        owner.PlayAnimTrigger("Dash");
-        Debug.Log($"[Dash] Start | Dir:{_direction}");
+        // 方向归一化
+        direction = direction.normalized;
+        if (direction == Vector2.zero)
+        {
+            direction = Vector2.right;
+        }
+
+        // 播放动画
+        player.PlayDashAnim();
+
+        // 设置速度
+        Rigidbody2D rb = player.GetRB();
+        if (rb != null)
+        {
+            rb.velocity = new Vector2(direction.x * speed, rb.velocity.y);
+        }
+
+        elapsed = 0f;
+        Debug.Log("Dash Start");
     }
 
-    public override void OnUpdate(CharacterActionSystem owner, float deltaTime)
+    public override void OnUpdate(CharacterActionSystem owner, float dt)
     {
-        _elapsed += deltaTime;
-        var ctx = owner.CurrentActionNode?.GetContext<DashContext>();
-        float speed = ctx?.speed ?? _defaultSpeed;
+        elapsed += dt;
 
-        owner.MoveCharacter(_direction, speed, useForce: false, preserveY: true);
+        PlayerController player = owner.GetComponent<PlayerController>();
+        Rigidbody2D rb = player?.GetRB();
+
+        if (rb != null)
+        {
+            rb.velocity = new Vector2(direction.x * speed, rb.velocity.y);
+        }
     }
 
     public override bool IsFinished(CharacterActionSystem owner)
     {
-        var ctx = owner.CurrentActionNode?.GetContext<DashContext>();
-        float duration = ctx != null ? _defaultDuration : _defaultDuration;  // 可扩展
-        return _elapsed >= duration;
+        return elapsed >= duration;
     }
 
     public override void OnExit(CharacterActionSystem owner)
     {
-        Debug.Log("[Dash] End");
+        PlayerController player = owner.GetComponent<PlayerController>();
+        Rigidbody2D rb = player?.GetRB();
+
+        if (rb != null)
+        {
+            rb.velocity = new Vector2(0, rb.velocity.y);
+        }
+
+        Debug.Log("Dash End");
     }
 }

@@ -76,65 +76,101 @@ public class CharacterActionSystem : MonoBehaviour
         Debug.Log($"[ActionSystem] 已注册: {action.ActionName}(ID:{action.ActionID})");
     }
 
-    // 核心：处理队列（支持缓冲等待）
     private void ProcessQueue(float dt)
     {
-        // 如果当前没有动作，尝试从队列取一个执行
-        if (currentActionNode == null && actionQueue.Count > 0)
+        // 如果当前动作正在执行且不可打断，跳过队列处理
+        if (currentActionLogic != null && !currentActionLogic.CanInterrupt)
         {
-            ActionNode nextNode = actionQueue.Peek();
-            ActionBase logic = actionLibrary.Get(nextNode.actionID);
+            // 但仍需要更新队列中节点的缓冲计时（预输入）
+            UpdateQueueBuffer(dt);
+            return;
+        }
 
-            if (logic == null)
+        if (actionQueue.Count == 0) return;
+
+        Debug.Log($"[Queue] 队列检查 | 数量:{actionQueue.Count} | 当前动作:{currentActionLogic?.ActionName ?? "无"}");
+
+        // 优先级排序：从队列中找出最高优先级的可执行动作
+        ActionNode bestNode = null;
+        ActionBase bestLogic = null;
+
+        var tempQueue = new Queue<ActionNode>();
+        while (actionQueue.Count > 0)
+        {
+            var node = actionQueue.Dequeue();
+            var logic = actionLibrary.Get(node.actionID);
+
+            if (logic != null && logic.CheckCondition(this))
             {
-                // 找不到动作逻辑，直接丢弃
-                actionQueue.Dequeue();
-                Debug.LogWarning($"[ActionSystem] 未找到 Action ID:{nextNode.actionID}");
-                return;
-            }
-
-            // 检查执行条件
-            if (logic.CheckCondition(this))
-            {
-                // 条件满足：检查打断逻辑
-                if (currentActionLogic != null && !currentActionLogic.CanInterrupt)
+                if (bestLogic == null || logic.Priority > bestLogic.Priority)
                 {
-                    // 当前动作不可打断，等待其结束
-                    return;
-                }
-
-                // 结束旧动作
-                if (currentActionLogic != null)
-                {
-                    currentActionLogic.OnExit(this);
-                    currentActionNode.state = ActionState.Completed;
-                    currentActionNode = null;
-                    currentActionLogic = null;
-                }
-
-                // 开始新动作
-                actionQueue.Dequeue();
-                StartAction(nextNode, logic);
-            }
-            else
-            {
-                // 条件不满足：进入缓冲等待
-                if (nextNode.UpdateBuffer(dt))
-                {
-                    // 仍在缓冲期内，调用回调
-                    logic.OnBufferUpdate(this, dt);
-                    // 不 dequeue，下一帧继续检查
+                    // 如果找到更高优先级，释放之前的候选节点回队列
+                    if (bestNode != null) tempQueue.Enqueue(bestNode);
+                    bestNode = node;
+                    bestLogic = logic;
                 }
                 else
                 {
-                    // 缓冲超时，丢弃动作
-                    actionQueue.Dequeue();
-                    nextNode.state = ActionState.Disabled;
-                    logic.OnBufferTimeout(this);
-                    Debug.Log($"[ActionSystem] Action {nextNode.actionID} 缓冲超时");
+                    tempQueue.Enqueue(node);
                 }
             }
+            else if (node.UpdateBuffer(dt))
+            {
+                // 条件不满足但仍在缓冲期内
+                logic?.OnBufferUpdate(this, dt);
+                tempQueue.Enqueue(node);
+            }
+            else
+            {
+                actionQueue.Dequeue();
+                // 缓冲超时，丢弃
+                node.state = ActionState.Disabled;
+                logic?.OnBufferTimeout(this);
+
+                Debug.Log($"[Buffer] 超时丢弃：{logic.ActionName}");
+            }
         }
+
+        // 恢复未执行的节点回队列
+        while (tempQueue.Count > 0)
+            actionQueue.Enqueue(tempQueue.Dequeue());
+
+        // 执行最高优先级的动作
+        if (bestNode != null && bestLogic != null)
+        {
+            // 打断当前动作（如果需要）
+            if (currentActionLogic != null)
+            {
+                currentActionLogic.OnExit(this);
+                currentActionNode.state = ActionState.Completed;
+            }
+
+            StartAction(bestNode, bestLogic);
+        }
+    }
+
+    // 辅助：单独更新队列缓冲（当当前动作不可打断时）
+    private void UpdateQueueBuffer(float dt)
+    {
+        var tempQueue = new Queue<ActionNode>();
+        while (actionQueue.Count > 0)
+        {
+            var node = actionQueue.Dequeue();
+            var logic = actionLibrary.Get(node.actionID);
+
+            if (node.UpdateBuffer(dt))
+            {
+                logic?.OnBufferUpdate(this, dt);
+                tempQueue.Enqueue(node);
+            }
+            else
+            {
+                node.state = ActionState.Disabled;
+                logic?.OnBufferTimeout(this);
+            }
+        }
+        while (tempQueue.Count > 0)
+            actionQueue.Enqueue(tempQueue.Dequeue());
     }
 
     // 提取：开始执行动作的公共方法
@@ -155,10 +191,11 @@ public class CharacterActionSystem : MonoBehaviour
 
             if (currentActionLogic.IsFinished(this))
             {
+                Debug.Log($"[System] 动作结束：{currentActionLogic.ActionName}");
                 currentActionLogic.OnExit(this);
                 currentActionNode.state = ActionState.Completed;
-                currentActionNode = null;
-                currentActionLogic = null;
+                currentActionNode = null;      // ← 确保清空
+                currentActionLogic = null;     // ← 确保清空
             }
         }
     }

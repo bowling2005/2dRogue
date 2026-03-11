@@ -291,8 +291,8 @@ Rigidbody2D:
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
   m_Mass: 1
-  m_LinearDrag: 0
-  m_AngularDrag: 0.05
+  m_LinearDrag: 4
+  m_AngularDrag: 2
   m_GravityScale: 2
   m_Material: {fileID: 0}
   m_IncludeLayers:
@@ -301,10 +301,10 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
-  m_CollisionDetection: 0
-  m_Constraints: 0
+  m_CollisionDetection: 1
+  m_Constraints: 4
 --- !u!114 &166237509
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -317,18 +317,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 48a1920c0c3476444acabbe1bda14ef3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _walkSpeed: 5
-  _dashSpeed: 15
-  _jumpForce: 8
-  _idIdle: 1000
-  _idWalk: 1002
-  _idJump: 1003
-  _idDash: 1001
-  _groundCheckPoint: {fileID: 1569890178}
-  _groundRadius: 0.2
-  _groundLayer:
+  actionSystem: {fileID: 166237510}
+  groundCheck: {fileID: 1569890178}
+  groundRadius: 0.45
+  groundLayer:
     serializedVersion: 2
     m_Bits: 256
+  moveSpeed: 6
+  jumpForce: 12
+  dashID: 1
+  jumpID: 2
 --- !u!114 &166237510
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1362,7 +1360,7 @@ CircleCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
   m_Offset: {x: 0, y: 0}

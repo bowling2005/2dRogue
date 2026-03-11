@@ -3,115 +3,146 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterActionSystem))]
 public class PlayerController : MonoBehaviour
 {
-    [Header("Movement")]
-    [SerializeField] private float _walkSpeed = 5f;
-    [SerializeField] private float _dashSpeed = 15f;
-    [SerializeField] private float _jumpForce = 8f;
+    [Header("Components")]
+    public CharacterActionSystem actionSystem;
+    public Transform groundCheck;
+    public float groundRadius = 0.15f;
+    public LayerMask groundLayer;
+
+    [Header("Settings")]
+    public float moveSpeed = 6f;
+    public float jumpForce = 12f;
 
     [Header("Action IDs")]
-    [SerializeField] private int _idIdle = 1000;
-    [SerializeField] private int _idWalk = 1002;
-    [SerializeField] private int _idJump = 1003;
-    [SerializeField] private int _idDash = 1001;
+    public int dashID = 1;
+    public int jumpID = 2;
 
-    [Header("Ground Check")]
-    [SerializeField] private Transform _groundCheckPoint;
-    [SerializeField] private float _groundRadius = 0.2f;
-    [SerializeField] private LayerMask _groundLayer;  // 设为 "Ground_checkLayer"
-
-    private CharacterActionSystem _system;
-    private CharacterActionSystem System => _system ??= GetComponent<CharacterActionSystem>();
-
-    // 输入状态
-    private Vector2 _moveInput;
-    private bool _jumpRequested;
-    private bool _dashRequested;
-    private bool _isGrounded;
-
-    // 缓冲时间配置
-    private const float BUFFER_JUMP = 0.2f;   // 跳跃缓冲 0.2 秒
-    private const float BUFFER_DASH = 0.15f;  // 冲刺缓冲 0.15 秒
-    private const float BUFFER_WALK = 0.1f;   // 行走缓冲 0.1 秒
+    private Vector2 input;
+    private Rigidbody2D rb;
+    private Animator anim;
+    private bool isGrounded;
 
     private void Awake()
     {
-        _system = GetComponent<CharacterActionSystem>();
-        RegisterActions();
-    }
+        rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>();
 
-    private void RegisterActions()
-    {
-        System.RegisterAction(new IdleAction());
-        System.RegisterAction(new WalkAction());
-        System.RegisterAction(new JumpAction());
-        System.RegisterAction(new DashAction());
+        if (actionSystem == null)
+        {
+            actionSystem = GetComponent<CharacterActionSystem>();
+        }
+
+        // 注册动作
+        actionSystem.RegisterAction(new DashAction(dashID, "Dash"));
+        actionSystem.RegisterAction(new JumpAction(jumpID, "Jump", jumpForce));
     }
 
     private void Update()
     {
-        CollectInput();
-        UpdateGroundCheck();
-        RequestActions();
+        float h = 0f;
+        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
+        {
+            h = -1f;
+        }
+        else if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
+        {
+            h = 1f;
+        }
+        input = new Vector2(h, 0);
+
+        // 检测地面
+        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundLayer);
+
+        Debug.Log($"[Debug] 输入 X:{h} | 地面:{isGrounded} | 系统执行中:{actionSystem.IsProcessing}");
+
+        // 处理输入
+        HandleInput();
+
+        // 更新基础动画（Idle/Run）
+        UpdateBaseAnimation();
     }
 
-    private void CollectInput()
+    private void HandleInput()
     {
-        // 获取输入
-        float h = Input.GetAxisRaw("Horizontal");
-        _moveInput = new Vector2(h, 0f).normalized;
-        if (_moveInput.x > 0.1f)
-            transform.localScale = new Vector3(1, 1, 1);
-        else if (_moveInput.x < -0.1f)
-            transform.localScale = new Vector3(-1, 1, 1);
+        // 冲刺：按 X 或 LeftShift
+        if (Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.LeftShift))
+        {
+            actionSystem.QueueAction(dashID, 0.15f, input);
+            Debug.Log("Dash Input");
+        }
 
-        // 请求标记（按键按下瞬间触发）
-        _jumpRequested |= Input.GetKeyDown(KeyCode.Space);
-        _dashRequested |= Input.GetKeyDown(KeyCode.L);
+        // 跳跃：按 Space 或 Z，必须在地面
+        if ((Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Z)) && isGrounded)
+        {
+            actionSystem.QueueAction(jumpID, 0.2f, null);
+            Debug.Log("Jump Input");
+        }
     }
 
-    private void UpdateGroundCheck()
+    private void UpdateBaseAnimation()
     {
-        _isGrounded = System.IsGrounded(_groundCheckPoint, _groundRadius, _groundLayer);
+        // 【调试】检查是否被跳过
+        if (actionSystem.IsProcessing)
+        {
+            Debug.Log("[Debug] 跳过基础移动 - 系统正在执行动作");
+            return;
+        }
+
+        Debug.Log("[Debug] 执行基础移动逻辑");
+
+        // 移动
+        if (input != Vector2.zero && isGrounded)
+        {
+            Debug.Log($"[Debug] 移动：速度={input.x * moveSpeed}");
+            rb.velocity = new Vector2(input.x * moveSpeed, rb.velocity.y);
+            anim.SetFloat("Speed", Mathf.Abs(input.x));
+
+            // 翻转角色
+            if (input.x > 0)
+            {
+                transform.localScale = new Vector3(1, 1, 1);
+            }
+            else if (input.x < 0)
+            {
+                transform.localScale = new Vector3(-1, 1, 1);
+            }
+        }
+        else if (isGrounded)
+        {
+            Debug.Log("[Debug] 待机状态");
+            rb.velocity = new Vector2(0, rb.velocity.y);
+            anim.SetFloat("Speed", 0);
+        }
+        else
+        {
+            Debug.Log("[Debug] 空中状态，不控制水平移动");
+        }
     }
 
-    private void RequestActions()
+    // ============ 供 Action 调用的方法 ============
+
+    public void PlayJumpAnim()
     {
-        //  优先级：跳跃 > 冲刺 > 行走 > 待机
-
-        //跳跃请求（支持预输入缓冲）
-        if (_jumpRequested)
-        {
-            var ctx = new JumpContext { jumpForce = _jumpForce };
-            System.QueueAction(_idJump, BUFFER_JUMP, ctx);
-            _jumpRequested = false;  // 消耗请求
-        }
-
-        //冲刺请求
-        if (_dashRequested)
-        {
-            var ctx = new DashContext { direction = _moveInput, speed = _dashSpeed };
-            System.QueueAction(_idDash, BUFFER_DASH, ctx);
-            _dashRequested = false;
-        }
-
-        //行走请求（持续请求，系统会去重更新）
-        // 只有接地时才允许行走
-        if (_isGrounded)
-        {
-            var ctx = new WalkContext { direction = _moveInput, speed = _walkSpeed };
-            System.QueueOrUpdateAction(_idWalk, BUFFER_WALK, ctx);
-        }
-
-        //待机请求：接地 + 无输入 + 无高优先级请求时
-        if (_isGrounded && _moveInput == Vector2.zero && !_jumpRequested && !_dashRequested)
-        {
-            System.QueueOrUpdateAction(_idIdle, 0f);  // 待机不需要缓冲
-        }
+        anim.SetTrigger("JumpTrigger");
     }
 
+    public void PlayDashAnim()
+    {
+        anim.SetTrigger("DashTrigger");
+    }
+
+    public void ResetJumpBool()
+    {
+        anim.SetBool("IsJumping", false);
+    }
+
+    public Rigidbody2D GetRB()
+    {
+        return rb;
+    }
+
+    public bool IsGrounded()
+    {
+        return isGrounded;
+    }
 }
-
-//上下文类：传递动作参数（类型安全）
-public class WalkContext { public Vector2 direction; public float speed; }
-public class JumpContext { public float jumpForce; }
-public class DashContext { public Vector2 direction; public float speed; }
