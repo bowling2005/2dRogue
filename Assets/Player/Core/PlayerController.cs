@@ -12,6 +12,7 @@ public class PlayerController : MonoBehaviour
     [Header("Settings")]
     public float moveSpeed = 6f;
     public float jumpForce = 12f;
+    public float health = 100f;
 
     [Header("Action IDs")]
     public int dashID = 1;
@@ -20,7 +21,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 input;
     private Rigidbody2D rb;
     private Animator anim;
-    private bool isGrounded;
+    public bool isGrounded;
 
     private void Awake()
     {
