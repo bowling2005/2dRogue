@@ -1,6 +1,6 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.UI; // 需要引用 UI
+using UnityEngine.UI;
 
 public class RoomManager : MonoBehaviour
 {
@@ -8,127 +8,112 @@ public class RoomManager : MonoBehaviour
 
     [Header("引用")]
     public GameObject player;
-    public Camera mainCamera;
+    public Image blackScreen;
 
-    [Header("黑屏遮罩 (UI Image)")]
-    // 找一个全屏黑色 Image 组件拖在这里
-    public Image blackScreenMask;
-
-    [Header("过渡设置")]
-    public float transitionDuration = 0.5f; // 相机移动耗时
+    [Header("过渡时间")]
+    public float fadeTime = 0.3f;
 
     private RoomNode currentRoom;
-    private bool isTransitioning = false;
+    private RoomNode[] allRooms;
+    private bool isTransitioning;
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
 
         if (player == null)
         {
             GameObject p = GameObject.FindGameObjectWithTag("Player");
-            if (p) player = p;
+            if (p != null) player = p;
         }
-        if (mainCamera == null) mainCamera = Camera.main;
 
-        // 确保黑屏初始是隐藏的
-        if (blackScreenMask != null)
-        {
-            Color c = blackScreenMask.color;
-            c.a = 0f;
-            blackScreenMask.color = c;
-            blackScreenMask.raycastTarget = false; // 防止阻挡输入
-        }
+        allRooms = FindObjectsOfType<RoomNode>();
     }
 
     private void Start()
     {
-        RoomNode[] nodes = FindObjectsOfType<RoomNode>();
-        foreach (var node in nodes) node.Init();
+        currentRoom = FindRoomForPlayer();
 
-        if (nodes.Length > 0)
+        if (currentRoom != null)
         {
-            // 简单策略：默认激活第一个，或者找离玩家最近的
-            // 这里为了演示，假设第一个就是出生点
-            ForceEnterRoom(nodes[0]);
+            foreach (var room in allRooms)
+            {
+                if (room == currentRoom) room.Activate();
+                else room.Deactivate();
+            }
+            Debug.Log($"[RoomManager] Start Room: {currentRoom.roomID}");
         }
     }
 
-    public void ForceEnterRoom(RoomNode room)
+    private RoomNode FindRoomForPlayer()
     {
-        if (currentRoom != null && currentRoom != room)
-            currentRoom.LeaveRoom();
+        if (player == null) return null;
 
-        currentRoom = room;
-        isTransitioning = false;
+        Vector2 playerPos = player.transform.position;
 
-        // 瞬间设置，无黑屏（用于游戏开始）
-        currentRoom.EnterRoom(mainCamera);
+        foreach (var room in allRooms)
+        {
+            if (room.ContainsPoint(playerPos))
+                return room;
+        }
+
+        return allRooms.Length > 0 ? allRooms[0] : null;
     }
 
-    public void OnPlayerTransition(RoomNode fromRoom, RoomNode toRoom)
+    public void RequestTransition(RoomNode from, RoomNode to)
     {
-        if (isTransitioning || toRoom == null || fromRoom != currentRoom) return;
+        if (isTransitioning || to == null || to == currentRoom) return;
+        if (from != currentRoom) return;
 
-        StartCoroutine(TransitionCoroutine(fromRoom, toRoom));
+        Debug.Log($"[RoomManager] Transition: {from.roomID} -> {to.roomID}");
+        StartCoroutine(Transition(to));
     }
 
-    private IEnumerator TransitionCoroutine(RoomNode fromRoom, RoomNode toRoom)
+    private IEnumerator Transition(RoomNode nextRoom)
     {
         isTransitioning = true;
 
-        // --- 步骤 1: 瞬间黑屏 ---
-        if (blackScreenMask != null)
+        yield return StartCoroutine(Fade(1f));
+
+        currentRoom.Deactivate();
+        nextRoom.Activate();
+
+        TeleportPlayer(nextRoom);
+
+        currentRoom = nextRoom;
+
+        yield return StartCoroutine(Fade(0f));
+
+        isTransitioning = false;
+    }
+
+    private IEnumerator Fade(float targetAlpha)
+    {
+        if (blackScreen == null) yield break;
+
+        Color start = blackScreen.color;
+        Color end = start;
+        end.a = targetAlpha;
+
+        float t = 0;
+        while (t < 1)
         {
-            Color c = blackScreenMask.color;
-            c.a = 1f; // 完全不透明
-            blackScreenMask.color = c;
-        }
-
-        // 等待一帧确保黑屏渲染出来，防止玩家看到切换瞬间
-        yield return null;
-
-        // --- 步骤 2: 处理房间逻辑 (旧房间隐藏，新房间激活) ---
-        fromRoom.LeaveRoom();
-        toRoom.EnterRoom(mainCamera);
-        // 注意：此时相机还没动，但新房间的物体已经激活在远处了，反正玩家看不见（黑屏）
-
-        // --- 步骤 3: 移动相机 ---
-        Vector3 startPos = mainCamera.transform.position;
-        Vector3 endPos = toRoom.transform.position; // 或者 toRoom.cameraArea.transform.position
-        // 确保 Z 轴不变
-        endPos.z = startPos.z;
-
-        // 如果 RoomNode 的 EnterRoom 已经修正了相机位置，这里可能只需要做插值动画
-        // 但为了平滑，我们手动插值位置
-
-        float elapsed = 0f;
-        while (elapsed < transitionDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / transitionDuration);
-            // 简单的线性插值，也可以用 SmoothStep
-            mainCamera.transform.position = Vector3.Lerp(startPos, endPos, t);
+            t += Time.deltaTime / fadeTime;
+            blackScreen.color = Color.Lerp(start, end, t);
             yield return null;
         }
 
-        // 确保最终位置精确匹配 RoomNode 定义的位置
-        // 再次调用 UpdateCameraView 确保 OrthoSize 等参数绝对正确（以防插值过程中有偏差）
-        // 其实 ToRoom.EnterRoom 里已经设过了，这里主要是修正 Position
-        mainCamera.transform.position = endPos;
-
-        // --- 步骤 4: 移除黑屏 ---
-        if (blackScreenMask != null)
-        {
-            Color c = blackScreenMask.color;
-            c.a = 0f;
-            blackScreenMask.color = c;
-        }
-
-        currentRoom = toRoom;
-        isTransitioning = false;
-
-        Debug.Log($"Switched to {toRoom.roomID}");
+        blackScreen.color = end;
     }
+
+    private void TeleportPlayer(RoomNode nextRoom)
+    {
+        if (player == null) return;
+        player.transform.position = nextRoom.cameraArea.transform.position;
+        Debug.Log($"[RoomManager] Player teleported to {nextRoom.roomID}");
+    }
+
+    public RoomNode GetCurrentRoom() => currentRoom;
 }

@@ -1,62 +1,62 @@
-using UnityEngine;
 using System;
+using UnityEngine;
 
 public class LeaveArea : MonoBehaviour
 {
-    [Header("连接设置 (留空即为墙壁)")]
-    public RoomNode topRoom;
-    public RoomNode bottomRoom;
-    public RoomNode leftRoom;
-    public RoomNode rightRoom;
+    [Header("连接目标")]
+    public RoomNode targetRoom;
+    public LeaveArea pairedExit;
 
-    public enum ExitDirection { None, Top, Bottom, Left, Right }
+    private RoomNode parentRoom;
+    private Collider2D collider2D;
 
-    // 事件：方向, 目标房间
-    public event Action<ExitDirection, RoomNode> OnPlayerLeft;
+    public event Action<RoomNode> OnExitTriggered;
 
-    private void OnTriggerEnter2D(Collider2D collision)
+    private void Awake()
     {
-        if (!collision.CompareTag("Player")) return;
-
-        Vector2 playerPos = collision.transform.position;
-        Vector2 areaPos = transform.position;
-        BoxCollider2D box = GetComponent<BoxCollider2D>();
-
-        if (box == null)
+        collider2D = GetComponent<Collider2D>();
+        if (collider2D == null)
         {
-            Debug.LogError($"LeaveArea on {gameObject.name} missing BoxCollider2D!");
-            return;
+            collider2D = gameObject.AddComponent<BoxCollider2D>();
         }
+        collider2D.isTrigger = true;
+    }
 
-        Vector2 size = new Vector2(box.size.x * transform.localScale.x, box.size.y * transform.localScale.y);
-        float offsetX = playerPos.x - areaPos.x;
-        float offsetY = playerPos.y - areaPos.y;
+    public void Init(RoomNode room)
+    {
+        parentRoom = room;
+    }
 
-        ExitDirection direction = ExitDirection.None;
-        RoomNode nextRoom = null;
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!other.CompareTag("Player")) return;
+        if (parentRoom == null || !parentRoom.IsActive) return;
+        if (targetRoom == null) return;
 
-        // 根据触发器形状判断方向
-        if (size.x > size.y)
+        Debug.Log($"[LeaveArea] {gameObject.name} triggered! Target: {targetRoom.roomID}");
+
+        OnExitTriggered?.Invoke(targetRoom);
+
+        if (RoomManager.Instance != null)
         {
-            // 扁平 -> 上下
-            if (offsetY > 0) { direction = ExitDirection.Top; nextRoom = topRoom; }
-            else { direction = ExitDirection.Bottom; nextRoom = bottomRoom; }
+            RoomManager.Instance.RequestTransition(parentRoom, targetRoom);
         }
-        else
-        {
-            // 瘦高 -> 左右
-            if (offsetX > 0) { direction = ExitDirection.Right; nextRoom = rightRoom; }
-            else { direction = ExitDirection.Left; nextRoom = leftRoom; }
-        }
+    }
 
-        // 【核心修改点 1】：如果 nextRoom 为 null，说明是墙壁，直接返回，不触发任何事件
-        if (nextRoom == null)
-        {
-            // 可选：如果你希望玩家碰到墙壁有反馈（如播放声音），可以在这里加
-            // Debug.Log("Hit a wall.");
-            return;
-        }
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = targetRoom != null ? Color.cyan : Color.red;
 
-        OnPlayerLeft?.Invoke(direction, nextRoom);
+        var box = GetComponent<BoxCollider2D>();
+        if (box != null)
+        {
+            Vector3 center = transform.position;
+            Vector3 size = new Vector3(
+                box.size.x * transform.localScale.x,
+                box.size.y * transform.localScale.y,
+                0
+            );
+            Gizmos.DrawWireCube(center, size);
+        }
     }
 }

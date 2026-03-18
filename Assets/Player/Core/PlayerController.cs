@@ -54,7 +54,7 @@ public class PlayerController : MonoBehaviour
         // 检测地面
         isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundRadius, groundLayer);
 
-        Debug.Log($"[Debug] 输入 X:{h} | 地面:{isGrounded} | 系统执行中:{actionSystem.IsProcessing}");
+        //Debug.Log($"[Debug] 输入 X:{h} | 地面:{isGrounded} | 系统执行中:{actionSystem.IsProcessing}");
 
         // 处理输入
         HandleInput();
@@ -69,14 +69,14 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.LeftShift))
         {
             actionSystem.QueueAction(dashID, 0.15f, input);
-            Debug.Log("Dash Input");
+           // Debug.Log("Dash Input");
         }
 
         // 跳跃：按 Space 或 Z，必须在地面
         if ((Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Z)) && isGrounded)
         {
             actionSystem.QueueAction(jumpID, 0.2f, null);
-            Debug.Log("Jump Input");
+           // Debug.Log("Jump Input");
         }
     }
 
@@ -85,16 +85,16 @@ public class PlayerController : MonoBehaviour
         // 【调试】检查是否被跳过
         if (actionSystem.IsProcessing)
         {
-            Debug.Log("[Debug] 跳过基础移动 - 系统正在执行动作");
+            //Debug.Log("[Debug] 跳过基础移动 - 系统正在执行动作");
             return;
         }
 
-        Debug.Log("[Debug] 执行基础移动逻辑");
+       // Debug.Log("[Debug] 执行基础移动逻辑");
 
         // 移动
         if (input != Vector2.zero && isGrounded)
         {
-            Debug.Log($"[Debug] 移动：速度={input.x * moveSpeed}");
+           // Debug.Log($"[Debug] 移动：速度={input.x * moveSpeed}");
             rb.velocity = new Vector2(input.x * moveSpeed, rb.velocity.y);
             anim.SetFloat("Speed", Mathf.Abs(input.x));
 
@@ -110,13 +110,13 @@ public class PlayerController : MonoBehaviour
         }
         else if (isGrounded)
         {
-            Debug.Log("[Debug] 待机状态");
+            //Debug.Log("[Debug] 待机状态");
             rb.velocity = new Vector2(0, rb.velocity.y);
             anim.SetFloat("Speed", 0);
         }
         else
         {
-            Debug.Log("[Debug] 空中状态，不控制水平移动");
+           // Debug.Log("[Debug] 空中状态，不控制水平移动");
         }
     }
 
