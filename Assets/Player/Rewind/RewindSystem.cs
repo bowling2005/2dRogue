@@ -45,7 +45,7 @@ public class RewindSystem : MonoBehaviour
         bufferSize = Mathf.CeilToInt(maxRewindTime / recordInterval) + 1;
         historyBuffer = new RewindSnapshot[bufferSize];
 
-        Debug.Log($"[RewindSystem] 缓冲区大小：{bufferSize}，预计内存：{bufferSize * 40 / 1024f:F2}KB");
+        //Debug.Log($"[RewindSystem] 缓冲区大小：{bufferSize}，预计内存：{bufferSize * 40 / 1024f:F2}KB");
 
         AutoAddComponentsToDisable();
     }
