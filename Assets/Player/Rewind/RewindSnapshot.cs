@@ -1,8 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// 倒带快照 - 使用 Sprite 索引而非引用，减少内存
-/// </summary>
 [System.Serializable]
 public struct RewindSnapshot
 {

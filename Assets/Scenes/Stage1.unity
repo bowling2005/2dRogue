@@ -193,6 +193,9 @@ GameObject:
   m_Component:
   - component: {fileID: 39768596}
   - component: {fileID: 39768597}
+  - component: {fileID: 39768599}
+  - component: {fileID: 39768600}
+  - component: {fileID: 39768601}
   m_Layer: 0
   m_Name: Isometric Diamond
   m_TagString: Untagged
@@ -209,7 +212,7 @@ Transform:
   m_GameObject: {fileID: 39768595}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.43, y: -1.62, z: 0}
+  m_LocalPosition: {x: 0.86, y: -1.38, z: 0}
   m_LocalScale: {x: 1.4, y: 1.4, z: 1.4}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -267,6 +270,63 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &39768599
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 39768595}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6bc93ea8560482f4caf34669fa668777, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  includeWhenInactive: 1
+  targetSprite: {fileID: 39768597}
+  targetAnimator: {fileID: 0}
+  recordHealth: 0
+  debugLog: 1
+--- !u!114 &39768600
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 39768595}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6820a8a39e1527f43991431311818e1b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  testObject: {fileID: 39768596}
+--- !u!50 &39768601
+Rigidbody2D:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 39768595}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDrag: 0
+  m_AngularDrag: 0.05
+  m_GravityScale: 0
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
 --- !u!1 &132665122
 GameObject:
   m_ObjectHideFlags: 0
@@ -2325,6 +2385,7 @@ MonoBehaviour:
   - {fileID: -405550287, guid: 3d077b03a13491f4890016febc8b7c0e, type: 3}
   - {fileID: 1951841252, guid: 3d077b03a13491f4890016febc8b7c0e, type: 3}
   - {fileID: -327222027, guid: 3d077b03a13491f4890016febc8b7c0e, type: 3}
+  - {fileID: 3625043607559282579, guid: 045b15ec09bba42448d89db77fa6f20a, type: 3}
   componentsToDisable:
   - {fileID: 166237506}
 --- !u!4 &1988096229

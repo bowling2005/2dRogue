@@ -11,7 +11,7 @@ public class LampManager : MonoBehaviour
     public bool enableGlobalControl = true;
 
     [Header("µ˜ ‘")]
-    public bool showDebugLogs = true;
+    public bool showDebugLogs = false;
 
     private Dictionary<string, Lamp> lamps = new Dictionary<string, Lamp>();
 
@@ -51,7 +51,7 @@ public class LampManager : MonoBehaviour
             if (!string.IsNullOrEmpty(config.lampId))
             {
                 configDict[config.lampId] = config;
-                if (showDebugLogs)
+                if (showDebugLogs) 
                     Debug.Log($"[LampManager] º”‘ÿ≈‰÷√: {config.lampId}, ÷° ˝: {config.frameIntensities?.Length ?? 0}");
             }
         }
