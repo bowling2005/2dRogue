@@ -24,6 +24,7 @@ public class StateMachine
         _states.Add(BossStateType.Patrol, new PatrolState(this, boss));
         _states.Add(BossStateType.Discover, new DiscoverState(this, boss));
         _states.Add(BossStateType.Fight, new FightState(this, boss));
+        _states.Add(BossStateType.Hurt, new HurtState(this, boss));
 
         // 默认进入待机状态
         ChangeState(BossStateType.Idle);
@@ -38,15 +39,15 @@ public class StateMachine
     // 6. 状态切换 (核心逻辑)
     public void ChangeState(BossStateType newStateType)
     {
-        // 如果状态相同，不切换
-        if (CurrentState != null && _states.ContainsKey(newStateType))
+        // 1. 如果新状态是 Hurt，先备份当前状态 (中断逻辑的核心)
+        if (newStateType == BossStateType.Hurt && CurrentState != null)
         {
-            // 如果已经是这个状态，可以选择是否强制重启，这里默认不处理
-            if (CurrentState is State currentState && _states[newStateType] == currentState)
-                return;
-        }
+            // 如果当前已经是 Hurt，避免重复嵌套备份
+            if (CurrentState is HurtState) return;
 
-        // 1. 退出旧状态
+            _boss.PreviousState = GetCurrentStateType(); 
+            Debug.Log($"StateMachine: Interrupted! Saving state: {_boss.PreviousState}");
+        }
         CurrentState?.OnExit();
 
         // 2. 获取新状态
@@ -60,6 +61,15 @@ public class StateMachine
         {
             Debug.LogError($"State {newStateType} not found in StateMachine!");
         }
+    }
+    public BossStateType GetCurrentStateType()
+    {
+        if (CurrentState is IdleState) return BossStateType.Idle;
+        if (CurrentState is PatrolState) return BossStateType.Patrol;
+        if (CurrentState is DiscoverState) return BossStateType.Discover;
+        if (CurrentState is FightState) return BossStateType.Fight;
+        if (CurrentState is HurtState) return BossStateType.Hurt;
+        return BossStateType.Idle;
     }
 
     // 7. 事件分发 (在 Boss 接收到外部事件时调用)

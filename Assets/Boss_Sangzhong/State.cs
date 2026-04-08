@@ -8,6 +8,7 @@ public abstract class State
     protected Boss _boss;
     // 方案 B：通过 Boss 访问技能管理器，实现复用
     protected SkillManager _skillManager;
+    protected Transform _transform;
 
     // 2. 构造函数 (依赖注入)
     // 在状态机创建状态时，必须传入这两个引用
@@ -17,6 +18,7 @@ public abstract class State
         _boss = boss;
         // 提前获取技能管理器引用，方便子类直接使用
         _skillManager = boss.SkillManager;
+        _transform = boss.Transform;
     }
 
     // 3. 生命周期方法 (虚函数，允许子类重写)
