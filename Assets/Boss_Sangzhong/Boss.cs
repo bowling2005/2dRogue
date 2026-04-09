@@ -44,6 +44,10 @@ public class Boss : MonoBehaviour
     private float _idleTimer = 0f;
     private bool _isPatrolForward = true; // 控制巡逻方向（往返）
 
+ // 1. 创建技能实例 (需要赋值预制体)
+    //public GameObject meleeEffectPrefab; 
+    public GameObject projectilePrefab;
+
     // --- 初始化 (Awake) ---
     private void Awake()
     {
@@ -51,7 +55,24 @@ public class Boss : MonoBehaviour
         Rb = GetComponent<Rigidbody2D>();
         Transform = GetComponent<Transform>();
 
+        // 初始化技能系统
         SkillManager = new SkillManager(this);
+
+        Skill melee = new MeleeAttackSkill(this);
+        Skill range = new ProjectileSkill(this, null); // 记得在 Inspector 赋值预制体
+
+        SkillManager.RegisterSkill(melee);
+        SkillManager.RegisterSkill(range);
+
+        // 2. 创建影响因子并配置权重
+        // 假设有 2 个技能：索引 0=Melee, 1=Range
+        // 血量越低，越倾向于远程 (权重：Melee 0.3, Range 0.8)
+        float[] healthWeights = new float[] { 0.3f, 0.8f };
+        SkillManager.GetDecisionMaker().AddFactor(new HealthLossFactor(healthWeights));
+
+        // 距离越近，越倾向于近战 (权重：Melee 0.9, Range 0.2)
+        float[] distWeights = new float[] { 0.9f, 0.2f };
+        SkillManager.GetDecisionMaker().AddFactor(new DistanceFactor(distWeights));
 
         StateMachine = new StateMachine();
         StateMachine.Initialize(this);
