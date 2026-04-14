@@ -11,6 +11,7 @@ public enum BossEvent
     HealthLow,        // µÍÑªÁ¿
     Attack_1,
     Attack_2,
-    Attack_3
-    
+    Attack_3,
+    ZeroHealth          //Ã»ÑªÁ¿
+
 }

@@ -8,8 +8,12 @@ public class SkillDecisionMaker
     private Boss _boss;
 
     // 决策频率控制
-    private float _decisionInterval = 0.5f;
+    [SerializeField] private float _decisionInterval = 2.5f;
     private float _lastDecisionTime = 0f;
+
+    // 冻结机制：当为 true 时，决策冷却计时暂停
+    private bool _isFrozen = false;
+    private float _frozenRemainingTime = 0f; // 冻结时保存的剩余冷却时间
 
     public SkillDecisionMaker(Boss boss)
     {
@@ -24,19 +28,26 @@ public class SkillDecisionMaker
     // 更新冷却 (每帧调用)
     public void Update(float delta)
     {
+        // 更新技能冷却 (不受冻结影响，技能冷却是全局的)
         foreach (var skill in _availableSkills)
         {
             skill.UpdateCooldown(delta);
         }
     }
 
-    // 核心决策方法 (由 FightState 调用)
+    // 核心决策方法
     public Skill SelectSkill(PlayerDetector detector)
     {
+        // 0. 冻结检查：如果被冻结，直接返回 null 表示"不决策"
+        if (_isFrozen)
+        {
+            return null;
+        }
+
         // 1. 频率检查
         if (Time.time - _lastDecisionTime < _decisionInterval)
         {
-            return null; // 冷却中，不重新决策
+            return null; // 冷却中
         }
 
         if (_availableSkills.Count == 0) return null;
@@ -49,13 +60,10 @@ public class SkillDecisionMaker
             float totalScore = 0f;
             int skillIndex = _availableSkills.IndexOf(skill);
 
-            // 遍历所有因子
             foreach (var factor in _factors)
             {
-                // 确保权重数组长度足够
                 if (skillIndex < factor.weights.Length)
                 {
-                    // 因子得分 (0~1) * 该技能对此因子的权重
                     float factorScore = Mathf.Clamp01(factor.CalculateScore(_boss, detector));
                     totalScore += factorScore * factor.weights[skillIndex];
                 }
@@ -64,7 +72,6 @@ public class SkillDecisionMaker
         }
 
         // 3. 排序取前 2
-        // 按分数降序排序
         var sortedSkills = new List<Skill>(skillScores.Keys);
         sortedSkills.Sort((a, b) => skillScores[b].CompareTo(skillScores[a]));
 
@@ -80,13 +87,49 @@ public class SkillDecisionMaker
         // 5. 刷新决策计时
         _lastDecisionTime = Time.time;
 
-        Debug.Log($"Decision: Selected {selectedSkill?.skillId} with score {skillScores[selectedSkill]}");
+        Debug.Log($"SkillDecision: Selected {selectedSkill?.skillId} (Score: {skillScores[selectedSkill]:F2})");
         return selectedSkill;
     }
 
-    // 外部强制刷新决策 (如技能释放完成后)
+    // === 冻结机制核心方法 ===
+
+    // 冻结决策：暂停冷却计时
+    public void Freeze()
+    {
+        if (_isFrozen) return; // 避免重复冻结
+
+        _isFrozen = true;
+        // 计算当前剩余冷却时间并保存
+        float elapsed = Time.time - _lastDecisionTime;
+        _frozenRemainingTime = Mathf.Max(0f, _decisionInterval - elapsed);
+        Debug.Log("SkillDecisionMaker: Frozen");
+    }
+
+    // 解冻决策：恢复冷却计时
+    public void Unfreeze()
+    {
+        if (!_isFrozen) return;
+
+        _isFrozen = false;
+        // 将 _lastDecisionTime 设置为"现在 - 剩余冷却时间"，实现冷却续期
+        _lastDecisionTime = Time.time - (_decisionInterval - _frozenRemainingTime);
+        _frozenRemainingTime = 0f;
+        Debug.Log("SkillDecisionMaker: Unfrozen");
+    }
+
+    // 强制重置：立即允许决策
     public void ResetDecisionTimer()
     {
+        _isFrozen = false;
         _lastDecisionTime = 0f;
+        _frozenRemainingTime = 0f;
+    }
+
+    // 查询状态 (供调试)
+    public bool IsFrozen() => _isFrozen;
+    public float GetRemainingCooldown()
+    {
+        if (_isFrozen) return _frozenRemainingTime;
+        return Mathf.Max(0f, _decisionInterval - (Time.time - _lastDecisionTime));
     }
 }

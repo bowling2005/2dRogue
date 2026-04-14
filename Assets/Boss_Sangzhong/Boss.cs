@@ -10,7 +10,9 @@ public class Boss : MonoBehaviour
     public SkillManager SkillManager { get; private set; }
     public PlayerDetector PlayerDetector { get; private set; }
 
-    public BossStateType PreviousState { get; set; } = BossStateType.Fight;
+    public MovementDecisionMaker MovementDecisionMaker { get; private set; }
+
+    public BossStateType PreviousState { get; set; } = BossStateType.Idle;
 
     // --- Unity 组件引用 (提供给 State 使用) ---
     // 状态类需要控制动画、移动、位置，所以暴露这些组件
@@ -55,6 +57,8 @@ public class Boss : MonoBehaviour
         Rb = GetComponent<Rigidbody2D>();
         Transform = GetComponent<Transform>();
 
+        //初始化探测器
+        PlayerDetector = GetComponent<PlayerDetector>();
         // 初始化技能系统
         SkillManager = new SkillManager(this);
 
@@ -73,6 +77,11 @@ public class Boss : MonoBehaviour
         // 距离越近，越倾向于近战 (权重：Melee 0.9, Range 0.2)
         float[] distWeights = new float[] { 0.9f, 0.2f };
         SkillManager.GetDecisionMaker().AddFactor(new DistanceFactor(distWeights));
+
+        // 初始化移动决策器
+        MovementDecisionMaker = new MovementDecisionMaker(this);
+        // 配置移动因子 (示例：血量低时 80% 概率远离)
+        MovementDecisionMaker.AddFactor(new HealthLossMovementFactor(new float[] { 0.2f, 0.6f }));
 
         StateMachine = new StateMachine();
         StateMachine.Initialize(this);
@@ -137,8 +146,12 @@ public class Boss : MonoBehaviour
         // 触发受伤事件
         StateMachine?.HandleEvent(BossEvent.TakeDamage, damage);
 
-        // 检查是否低血量
-        if (CurrentHealth < MaxHealth * 0.3f)
+        if (CurrentHealth <= 0f)
+        {
+            CurrentHealth = 0;
+            StateMachine?.HandleEvent(BossEvent.ZeroHealth);
+        }
+        else if (CurrentHealth < MaxHealth * 0.3f)
         {
             StateMachine?.HandleEvent(BossEvent.HealthLow);
         }
@@ -170,15 +183,14 @@ public class Boss : MonoBehaviour
         SetSpeed(MoveSpeed);
     }
 
-    public void OnHurtAnimationEnd()
+    public void MoveTowardsTarget(Vector2 targetPos, float speed)
     {
-        // 如果当前确实是受伤状态，则请求切回之前的状态
-        if (StateMachine?.CurrentState is HurtState)
-        {
-            StateMachine.ChangeState(PreviousState);
-        }
+        //后续需要补充A*寻路接近目标代码
     }
-
+    public void MoveAwayFromTarget(Vector2 targetPos, float speed)
+    {
+        //后续需要补充远离目标代码
+    }
     public void ApplyVelocityDampen(float dampFactor = 0.1f)
     {
         if (Rb != null && Rb.velocity.x >= 0.3f)
@@ -215,12 +227,26 @@ public class Boss : MonoBehaviour
         }
     }
 
+
     public float GetIdleWaitTime() => idleWaitTime;
     public void SetIdleTimer(float time) => _idleTimer = time;
     public float GetIdleTimer() => _idleTimer;
     public void AddIdleTimer(float delta) => _idleTimer += delta;
     public void ResetIdleTimer() => _idleTimer = 0f;
+    public void OnActionEnd()
+    {
+        if (Animator != null)
+            Animator.SetBool("IsActing", false);
+    }
 
+    public void OnHurtAnimationEnd()
+    {
+        // 如果当前确实是受伤状态，则请求切回之前的状态
+        if (StateMachine?.CurrentState is HurtState)
+        {
+            StateMachine.ChangeState(PreviousState);
+        }
+    }
     // 为了方便调试，在 Inspector 上显示当前状态
     private void OnGUI()
     {

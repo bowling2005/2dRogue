@@ -25,6 +25,7 @@ public class StateMachine
         _states.Add(BossStateType.Discover, new DiscoverState(this, boss));
         _states.Add(BossStateType.Fight, new FightState(this, boss));
         _states.Add(BossStateType.Hurt, new HurtState(this, boss));
+        _states.Add(BossStateType.Death, new DeathState(this, boss)); 
 
         // 默认进入待机状态
         ChangeState(BossStateType.Idle);
