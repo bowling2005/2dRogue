@@ -36,19 +36,19 @@ public class CharacterActionSystem : MonoBehaviour
     {
         if (actionQueue.Count >= maxQueueSize)
         {
-            Debug.LogWarning($"[ActionSystem] 队列已满，丢弃 Action {actionID}");
+            //Debug.LogWarning($"[ActionSystem] 队列已满，丢弃 Action {actionID}");
             return;
         }
 
         if (IsActionDisabled(actionID))
         {
-            Debug.Log($"[ActionSystem] Action {actionID} 被禁用");
+           // Debug.Log($"[ActionSystem] Action {actionID} 被禁用");
             return;
         }
 
         ActionNode node = new ActionNode(actionID, bufferSec, context);
         actionQueue.Enqueue(node);
-        Debug.Log($"[ActionSystem] 入队: {actionID} (缓冲:{bufferSec}s)");
+        //Debug.Log($"[ActionSystem] 入队: {actionID} (缓冲:{bufferSec}s)");
     }
 
     public void QueueOrUpdateAction(int actionID, float bufferSec = 0.2f, object context = null)
@@ -61,7 +61,7 @@ public class CharacterActionSystem : MonoBehaviour
                 // 更新上下文和缓冲计时
                 node.context = context;
                 node.elapsedBufferTime = 0f;  // 重置缓冲
-                Debug.Log($"[ActionSystem] 更新已有请求: {actionID}");
+               // Debug.Log($"[ActionSystem] 更新已有请求: {actionID}");
                 return;
             }
         }
@@ -73,7 +73,7 @@ public class CharacterActionSystem : MonoBehaviour
     {
         if (action == null) return;
         actionLibrary.Add(action.ActionID, action);
-        Debug.Log($"[ActionSystem] 已注册: {action.ActionName}(ID:{action.ActionID})");
+        //Debug.Log($"[ActionSystem] 已注册: {action.ActionName}(ID:{action.ActionID})");
     }
 
     private void ProcessQueue(float dt)
@@ -88,7 +88,7 @@ public class CharacterActionSystem : MonoBehaviour
 
         if (actionQueue.Count == 0) return;
 
-        Debug.Log($"[Queue] 队列检查 | 数量:{actionQueue.Count} | 当前动作:{currentActionLogic?.ActionName ?? "无"}");
+       // Debug.Log($"[Queue] 队列检查 | 数量:{actionQueue.Count} | 当前动作:{currentActionLogic?.ActionName ?? "无"}");
 
         // 优先级排序：从队列中找出最高优先级的可执行动作
         ActionNode bestNode = null;
@@ -127,7 +127,7 @@ public class CharacterActionSystem : MonoBehaviour
                 node.state = ActionState.Disabled;
                 logic?.OnBufferTimeout(this);
 
-                Debug.Log($"[Buffer] 超时丢弃：{logic.ActionName}");
+                //Debug.Log($"[Buffer] 超时丢弃：{logic.ActionName}");
             }
         }
 
@@ -180,7 +180,7 @@ public class CharacterActionSystem : MonoBehaviour
         currentActionNode = node;
         currentActionLogic = logic;
         currentActionLogic.OnEnter(this);
-        Debug.Log($"[ActionSystem] 开始执行: {logic.ActionName}");
+       // Debug.Log($"[ActionSystem] 开始执行: {logic.ActionName}");
     }
 
     private void UpdateCurrentAction(float dt)
@@ -191,7 +191,7 @@ public class CharacterActionSystem : MonoBehaviour
 
             if (currentActionLogic.IsFinished(this))
             {
-                Debug.Log($"[System] 动作结束：{currentActionLogic.ActionName}");
+              //  Debug.Log($"[System] 动作结束：{currentActionLogic.ActionName}");
                 currentActionLogic.OnExit(this);
                 currentActionNode.state = ActionState.Completed;
                 currentActionNode = null;      // ← 确保清空
